@@ -39,6 +39,9 @@ public:
         const JsonValue& operator[](size_t index) const {
             return elements[index];
         }
+        JsonValue& operator[](size_t index) {
+            return elements[index];
+        }
     };
 
     struct JsonObject {
@@ -52,16 +55,24 @@ public:
             }
             throw std::runtime_error("Key not found: " + std::string(key));
         }
+        JsonValue& operator[](std::string_view key) {
+            for (auto& [k, v] : members) {
+                if (k == key) {
+                    return v;
+                }
+            }
+            throw std::runtime_error("Key not found: " + std::string(key));
+        }
     };
 
-    JsonParser() noexcept = default;
-    ~JsonParser() noexcept = default;
-    JsonParser(const JsonParser& other) noexcept = default;
-    JsonParser& operator=(const JsonParser& other) noexcept = default;
-    JsonParser(JsonParser&& other) noexcept = default;
-    JsonParser& operator=(JsonParser&& other) noexcept = default;
+    constexpr JsonParser() noexcept = default;
+    constexpr ~JsonParser() noexcept = default;
+    constexpr JsonParser(const JsonParser& other) noexcept = default;
+    constexpr JsonParser& operator=(const JsonParser& other) noexcept = default;
+    constexpr JsonParser(JsonParser&& other) noexcept = default;
+    constexpr JsonParser& operator=(JsonParser&& other) noexcept = default;
 
-    JsonValue parse(std::string_view json) const {
+    constexpr JsonValue parse(std::string_view json) const {
         size_t pos = 0;
         skipWhitespace(json, pos);
         return parseValue(json, pos);
@@ -102,7 +113,7 @@ public:
         return std::get<bool>(value);
     }
 
-    static int toInt(const JsonValue& value) {
+    static constexpr int toInt(const JsonValue& value) {
         if (!isInt(value)) {
             throw std::runtime_error("Value is not an integer");
         }
@@ -123,14 +134,14 @@ public:
         return std::get<std::string_view>(value);
     }
 
-    static const JsonArray& toArray(const JsonValue& value) {
+    static constexpr const JsonArray& toArray(const JsonValue& value) {
         if (!isArray(value)) {
             throw std::runtime_error("Value is not an array");
         }
         return std::get<JsonArray>(value);
     }
 
-    static const JsonObject& toObject(const JsonValue& value) {
+    static constexpr const JsonObject& toObject(const JsonValue& value) {
         if (!isObject(value)) {
             throw std::runtime_error("Value is not an object");
         }
@@ -138,7 +149,7 @@ public:
     }
 
 private:
-    void skipWhitespace(std::string_view json, size_t& pos) const {
+    constexpr void skipWhitespace(std::string_view json, size_t& pos) const {
         while (pos < json.size() && isspace(json[pos]))
             ++pos;
     }
@@ -169,8 +180,8 @@ private:
 
     constexpr std::nullptr_t parseNull(std::string_view json, size_t& pos) const {
         constexpr auto null = std::string_view("ull");
-        if (json.substr(pos + 1, null.size()) == null) {
-            pos += 4;
+        if (json.find(null, pos + 1) == pos + 1) {
+            pos += null.size() + 1;
             return nullptr;
         }
         throw std::runtime_error("Invalid JSON: expected 'null'");
@@ -178,8 +189,8 @@ private:
 
     constexpr bool parseTrue(std::string_view json, size_t& pos) const {
         constexpr auto str = std::string_view("rue");
-        if (json.substr(pos + 1, str.size()) == str) {
-            pos += 4;
+        if (json.find(str, pos + 1) == pos + 1) {
+            pos += str.size() + 1;
             return true;
         }
         throw std::runtime_error("Invalid JSON: expected 'true'");
@@ -187,8 +198,8 @@ private:
 
     constexpr bool parseFalse(std::string_view json, size_t& pos) const {
         constexpr auto str = std::string_view("alse");
-        if (json.substr(pos + 1, str.size()) == str) {
-            pos += 5;
+        if (json.find(str, pos + 1) == pos + 1) {
+            pos += str.size() + 1;
             return false;
         }
         throw std::runtime_error("Invalid JSON: expected 'false'");
@@ -196,7 +207,7 @@ private:
 
     constexpr std::string_view parseString(std::string_view json, size_t& pos) const {
         consume(json, pos); // consume opening quote
-        size_t startPos = pos;
+        const size_t startPos = pos;
         while (peek(json, pos) != '"') {
             if (peek(json, pos) == '\\') {
                 ++pos; // skip escape character

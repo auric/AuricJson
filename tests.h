@@ -66,11 +66,11 @@ void runTests() {
     }
 
     {
-        std::string_view jsonStr = R"("Émoji 😃 Привет")";
+        std::string_view jsonStr = R"("Émoji 😃 Привіт")";
         JsonParser parser;
         JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
         assert(JsonParser::isString(jsonValue));
-        assert(JsonParser::toString(jsonValue) == "Émoji 😃 Привет");
+        assert(JsonParser::toString(jsonValue) == "Émoji 😃 Привіт");
     }
 
     {
