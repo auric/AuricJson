@@ -1,0 +1,6 @@
+BasedOnStyle: WebKit
+PointerAlignment: Right
+ReferenceAlignment: Right
+QualifierAlignmentStyle: Left
+BraceWrapping:
+    SplitEmptyRecord: true
