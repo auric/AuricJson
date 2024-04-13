@@ -28,7 +28,7 @@ public:
         bool,
         int,
         double,
-        std::string_view,
+        std::string,
         JsonArray,
         JsonObject
         >;
@@ -45,7 +45,7 @@ public:
     };
 
     struct JsonObject {
-        std::vector<std::pair<std::string_view, JsonValue>> members;
+        std::vector<std::pair<std::string, JsonValue>> members;
 
         const JsonValue& operator[](std::string_view key) const {
             for (const auto& [k, v] : members) {
@@ -95,7 +95,7 @@ public:
     }
 
     static constexpr bool isString(const JsonValue& value) {
-        return std::holds_alternative<std::string_view>(value);
+        return std::holds_alternative<std::string>(value);
     }
 
     static constexpr bool isArray(const JsonValue& value) {
@@ -127,11 +127,11 @@ public:
         return std::get<double>(value);
     }
 
-    static constexpr std::string_view toString(const JsonValue& value) {
+    static constexpr std::string toString(const JsonValue& value) {
         if (!isString(value)) {
             throw std::runtime_error("Value is not a string");
         }
-        return std::get<std::string_view>(value);
+        return std::get<std::string>(value);
     }
 
     static constexpr const JsonArray& toArray(const JsonValue& value) {
@@ -205,9 +205,9 @@ private:
         throw std::runtime_error("Invalid JSON: expected 'false'");
     }
 
-    constexpr std::string_view parseString(std::string_view json, size_t& pos) const {
+    constexpr std::string parseString(std::string_view json, size_t& pos) const {
+        std::string str;
         consume(json, pos); // consume opening quote
-        const size_t startPos = pos;
         while (peek(json, pos) != '"') {
             if (peek(json, pos) == '\\') {
                 ++pos; // skip escape character
@@ -215,22 +215,27 @@ private:
                 case '"':
                 case '\\':
                 case '/':
-                    ++pos;
+                    str += consume(json, pos);
                     break;
                 case 'b':
                     ++pos;
+                    str += '\b';
                     break;
                 case 'f':
                     ++pos;
+                    str += '\f';
                     break;
                 case 'n':
                     ++pos;
+                    str += '\n';
                     break;
                 case 'r':
                     ++pos;
+                    str += '\r';
                     break;
                 case 't':
                     ++pos;
+                    str += '\t';
                     break;
                 case 'u': {
                     ++pos;
@@ -247,17 +252,34 @@ private:
                             throw std::runtime_error("Invalid Unicode escape sequence");
                         ++pos;
                     }
+                    // Encode the Unicode codepoint as UTF-8
+                    if (codepoint <= 0x7F) {
+                        str += static_cast<char>(codepoint);
+                    } else if (codepoint <= 0x7FF) {
+                        str += static_cast<char>(0xC0 | (codepoint >> 6));
+                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
+                    } else if (codepoint <= 0xFFFF) {
+                        str += static_cast<char>(0xE0 | (codepoint >> 12));
+                        str += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
+                    } else if (codepoint <= 0x10FFFF) {
+                        str += static_cast<char>(0xF0 | (codepoint >> 18));
+                        str += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+                        str += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
+                    } else {
+                        throw std::runtime_error("Invalid Unicode codepoint");
+                    }
                     break;
                 }
                 default:
                     throw std::runtime_error("Invalid escape sequence");
                 }
             } else {
-                ++pos;
+                str += consume(json, pos);
             }
         }
-        std::string_view str = json.substr(startPos, pos - startPos);
-        ++pos; // consume closing quote
+        consume(json, pos); // consume closing quote
         return str;
     }
 
@@ -345,12 +367,12 @@ private:
         if (peek(json, pos) != '}') {
             size_t memberCount = 0;
             while (true) {
-                std::string_view key = parseString(json, pos);
+                auto key = parseString(json, pos);
                 skipWhitespace(json, pos);
                 if (consume(json, pos) != ':')
                     throw std::runtime_error("Invalid JSON: expected ':'");
                 skipWhitespace(json, pos);
-                obj.members.emplace_back(std::string(key), parseValue(json, pos));
+                obj.members.emplace_back(std::move(key), parseValue(json, pos));
                 ++memberCount;
                 skipWhitespace(json, pos);
                 if (peek(json, pos) == '}')
@@ -365,3 +387,48 @@ private:
         return obj;
     }
 };
+
+constexpr bool operator==(const JsonParser::JsonValue& lhs, const JsonParser::JsonValue& rhs) {
+    return std::visit(
+        [](const auto& l, const auto& r) {
+            using T1 = std::decay_t<decltype(l)>;
+            using T2 = std::decay_t<decltype(r)>;
+
+            if constexpr (std::is_same_v<T1, std::nullptr_t> && std::is_same_v<T2, std::nullptr_t>) {
+                return true;
+            } else if constexpr (std::is_same_v<T1, bool> && std::is_same_v<T2, bool>) {
+                return l == r;
+            } else if constexpr (std::is_same_v<T1, int> && std::is_same_v<T2, int>) {
+                return l == r;
+            } else if constexpr (std::is_same_v<T1, double> && std::is_same_v<T2, double>) {
+                return l == r;
+            } else if constexpr (std::is_same_v<T1, std::string> && std::is_same_v<T2, std::string>) {
+                return l == r;
+            }
+            else if constexpr (std::is_same_v<T1, std::string_view> && std::is_same_v<T2, std::string>) {
+                return l == r;
+            }
+            else if constexpr (std::is_same_v<T1, std::string> && std::is_same_v<T2, std::string_view>) {
+                return l == r;
+            }
+            else if constexpr (std::is_same_v<T1, JsonParser::JsonArray> && std::is_same_v<T2, JsonParser::JsonArray>) {
+                return l.elements == r.elements;
+            } else if constexpr (std::is_same_v<T1, JsonParser::JsonObject> && std::is_same_v<T2, JsonParser::JsonObject>) {
+                return l.members == r.members;
+            } else {
+                return false;
+            }
+        },
+        lhs, rhs);
+}
+
+constexpr bool operator==(const std::vector<std::pair<std::string, JsonParser::JsonValue>>& lhs,
+                          const std::vector<std::pair<std::string, JsonParser::JsonValue>>& rhs) {
+    if (lhs.size() != rhs.size())
+        return false;
+
+    return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
+                      [](const auto& l, const auto& r) {
+                          return l.first == r.first && l.second == r.second;
+                      });
+}
