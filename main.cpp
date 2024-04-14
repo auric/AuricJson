@@ -8,6 +8,7 @@
 
 int main(int argc, char** argv) {
     runTests();
+    runComplexTests();
     std::cout << "All tests passed!" << std::endl;
 
     std::string jsonStr = R"(

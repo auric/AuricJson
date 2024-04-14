@@ -21,12 +21,15 @@ add_executable(auric_json
     main.cpp
     auric_json.h
     tests.h
-    benchmark.cpp)
+    benchmark.cpp
+)
 
 target_link_libraries(auric_json
     benchmark::benchmark
     benchmark::benchmark_main
-    nlohmann_json::nlohmann_json)
+    nlohmann_json::nlohmann_json
+    )
+
 target_include_directories(auric_json PRIVATE
     "D:/dev/libs/matplotlib-cpp"
     "D:/dev/libs/RapidJSON/include"
