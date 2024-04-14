@@ -200,6 +200,109 @@ void runTests() {
         assert(std::holds_alternative<bool>(obj.members[5].second));
         assert(std::get<bool>(obj.members[5].second) == true);
     }
+
+    // Test parsing empty arrays and objects
+    {
+        std::string_view jsonStr = "[]";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isArray(jsonValue));
+        const auto& arr = JsonParser::toArray(jsonValue);
+        assert(arr.elements.empty());
+    }
+
+    {
+        std::string_view jsonStr = "{}";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isObject(jsonValue));
+        const auto& obj = JsonParser::toObject(jsonValue);
+        assert(obj.members.empty());
+    }
+
+    // Test parsing numbers with exponents
+    {
+        std::string_view jsonStr = "1.23e+4";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isDouble(jsonValue));
+        assert(std::abs(JsonParser::toDouble(jsonValue) - 1.23e+4) < 0.001);
+    }
+
+    {
+        std::string_view jsonStr = "-5.67E-8";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isDouble(jsonValue));
+        assert(std::abs(JsonParser::toDouble(jsonValue) - (-5.67e-8)) < 0.001);
+    }
+
+    // Test parsing numbers with leading zeros
+    {
+        std::string_view jsonStr = "0123";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isInt(jsonValue));
+        assert(JsonParser::toInt(jsonValue) == 123);
+    }
+
+    // Test parsing an array with trailing comma
+    {
+        std::string_view jsonStr = "[1, 2, 3,]";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isArray(jsonValue));
+        const auto& arr = JsonParser::toArray(jsonValue);
+        assert(arr.elements.size() == 3);
+        assert(JsonParser::toInt(arr.elements[0]) == 1);
+        assert(JsonParser::toInt(arr.elements[1]) == 2);
+        assert(JsonParser::toInt(arr.elements[2]) == 3);
+    }
+
+    // Test parsing an object with trailing comma
+    {
+        std::string_view jsonStr = R"({"a": 1, "b": 2,})";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isObject(jsonValue));
+        const auto& obj = JsonParser::toObject(jsonValue);
+        assert(obj.members.size() == 2);
+        assert(JsonParser::toInt(obj["a"]) == 1);
+        assert(JsonParser::toInt(obj["b"]) == 2);
+    }
+
+    // Test parsing numbers with limits
+    {
+        std::string_view jsonStr = "2147483647";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isInt(jsonValue));
+        assert(JsonParser::toInt(jsonValue) == std::numeric_limits<int>::max());
+    }
+
+    {
+        std::string_view jsonStr = "-2147483648";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isInt(jsonValue));
+        assert(JsonParser::toInt(jsonValue) == std::numeric_limits<int>::min());
+    }
+
+    {
+        std::string_view jsonStr = "1.7976931348623157E+308";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isDouble(jsonValue));
+        assert(std::abs(JsonParser::toDouble(jsonValue) - std::numeric_limits<double>::max()) < 0.001);
+    }
+
+    {
+        std::string_view jsonStr = "-1.7976931348623157E+308";
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isDouble(jsonValue));
+        assert(std::abs(JsonParser::toDouble(jsonValue) - std::numeric_limits<double>::lowest()) < 0.001);
+    }
 }
 
 void runComplexTests() {
@@ -346,4 +449,62 @@ void runComplexTests() {
     assert(JsonParser::isObject(nestedObjC["d"]));
     const JsonParser::JsonObject& nestedObjD = JsonParser::toObject(nestedObjC["d"]);
     assert(nestedObjD["e"] == "nested");
+
+    // Test parsing a complex JSON structure with various data types
+    {
+        std::string_view jsonStr = R"(
+            {
+                "name": "John Doe",
+                "age": 30,
+                "address": {
+                    "street": "123 Main St",
+                    "city": "New York",
+                    "country": "USA"
+                },
+                "phoneNumbers": [
+                    "555-1234",
+                    "555-5678"
+                ],
+                "email": null,
+                "married": false,
+                "children": [],
+                "scores": [7.5, 8.2, 9.0],
+                "description": "Hello, world! 😊 これは日本語のテキストです。 🇯🇵",
+                "escaped": "Tab:\t Newline:\n Quote:\" Backslash:\\ Unicode:\u2728"
+            }
+        )";
+
+        JsonParser parser;
+        JsonParser::JsonValue jsonValue = parser.parse(jsonStr);
+        assert(JsonParser::isObject(jsonValue));
+        const auto& obj = JsonParser::toObject(jsonValue);
+
+        assert(obj["name"] == "John Doe");
+        assert(JsonParser::toInt(obj["age"]) == 30);
+
+        const auto& address = JsonParser::toObject(obj["address"]);
+        assert(address["street"] == "123 Main St");
+        assert(address["city"] == "New York");
+        assert(address["country"] == "USA");
+
+        const auto& phoneNumbers = JsonParser::toArray(obj["phoneNumbers"]);
+        assert(phoneNumbers.elements.size() == 2);
+        assert(phoneNumbers.elements[0] == "555-1234");
+        assert(phoneNumbers.elements[1] == "555-5678");
+
+        assert(JsonParser::isNull(obj["email"]));
+        assert(JsonParser::toBool(obj["married"]) == false);
+
+        const auto& children = JsonParser::toArray(obj["children"]);
+        assert(children.elements.empty());
+
+        const auto& scores = JsonParser::toArray(obj["scores"]);
+        assert(scores.elements.size() == 3);
+        assert(std::abs(JsonParser::toDouble(scores.elements[0]) - 7.5) < 0.001);
+        assert(std::abs(JsonParser::toDouble(scores.elements[1]) - 8.2) < 0.001);
+        assert(std::abs(JsonParser::toDouble(scores.elements[2]) - 9.0) < 0.001);
+
+        assert(obj["description"] == "Hello, world! 😊 これは日本語のテキストです。 🇯🇵");
+        assert(obj["escaped"] == "Tab:\t Newline:\n Quote:\" Backslash:\\ Unicode:✨");
+    }
 }

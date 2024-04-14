@@ -355,6 +355,8 @@ private:
                 if (consume(json, pos) != ',')
                     throw std::runtime_error("Invalid JSON: expected ',' or ']'");
                 skipWhitespace(json, pos);
+                if (peek(json, pos) == ']')
+                    break; // Allow trailing comma
             }
             arr.elements.reserve(elemCount); // Avoid reallocations
         }
@@ -382,6 +384,8 @@ private:
                 if (consume(json, pos) != ',')
                     throw std::runtime_error("Invalid JSON: expected ',' or '}'");
                 skipWhitespace(json, pos);
+                if (peek(json, pos) == '}')
+                    break; // Allow trailing comma
             }
             obj.members.reserve(memberCount); // Avoid reallocations
         }
