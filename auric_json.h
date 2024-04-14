@@ -208,6 +208,7 @@ private:
     constexpr std::string parseString(std::string_view json, size_t& pos) const {
         std::string str;
         consume(json, pos); // consume opening quote
+
         while (peek(json, pos) != '"') {
             if (peek(json, pos) == '\\') {
                 ++pos; // skip escape character
@@ -239,19 +240,7 @@ private:
                     break;
                 case 'u': {
                     ++pos;
-                    uint32_t codepoint = 0;
-                    for (int i = 0; i < 4; ++i) {
-                        char c = peek(json, pos);
-                        if (c >= '0' && c <= '9')
-                            codepoint = (codepoint << 4) + (c - '0');
-                        else if (c >= 'A' && c <= 'F')
-                            codepoint = (codepoint << 4) + (c - 'A' + 10);
-                        else if (c >= 'a' && c <= 'f')
-                            codepoint = (codepoint << 4) + (c - 'a' + 10);
-                        else
-                            throw std::runtime_error("Invalid Unicode escape sequence");
-                        ++pos;
-                    }
+                    uint32_t codepoint = parseUnicodeEscape(json, pos);
                     // Encode the Unicode codepoint as UTF-8
                     if (codepoint <= 0x7F) {
                         str += static_cast<char>(codepoint);
@@ -279,8 +268,23 @@ private:
                 str += consume(json, pos);
             }
         }
+
         consume(json, pos); // consume closing quote
         return str;
+    }
+
+    uint32_t parseUnicodeEscape(std::string_view json, size_t& pos) const {
+        uint32_t codepoint = 0;
+        for (int i = 0; i < 4; ++i) {
+            char c = peek(json, pos);
+            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) {
+                codepoint = (codepoint << 4) + (c >= 'A' ? (10 + c - 'A') : (c - '0'));
+            } else {
+                throw std::runtime_error("Invalid Unicode escape sequence");
+            }
+            ++pos;
+        }
+        return codepoint;
     }
 
     JsonValue parseNumber(std::string_view json, size_t& pos) const {
