@@ -1,7 +1,7 @@
 #include <benchmark/benchmark.h>
 #include <nlohmann/json.hpp>
 #include <rapidjson/document.h>
-#include "auric_json.h"
+#include "../auric_json.h"
 
 const std::string kSmallJson = R"(
     {
@@ -196,4 +196,4 @@ BENCHMARK(BM_AuricJson_ParseLargeJson);
 BENCHMARK(BM_NlohmannJson_ParseLargeJson);
 BENCHMARK(BM_RapidJson_ParseLargeJson);
 
-//BENCHMARK_MAIN();
+BENCHMARK_MAIN();
