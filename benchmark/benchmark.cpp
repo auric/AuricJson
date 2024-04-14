@@ -120,7 +120,7 @@ const std::string kLargeJson = R"(
 static void BM_AuricJson_ParseSmallJson(benchmark::State& state) {
     for (auto _ : state) {
         JsonParser parser;
-        JsonParser::JsonValue json = parser.parse(kSmallJson);
+        JsonValue json = parser.parse(kSmallJson);
         benchmark::DoNotOptimize(json);
     }
 }
@@ -143,7 +143,7 @@ static void BM_RapidJson_ParseSmallJson(benchmark::State& state) {
 static void BM_AuricJson_ParseMediumJson(benchmark::State& state) {
     for (auto _ : state) {
         JsonParser parser;
-        JsonParser::JsonValue json = parser.parse(kMediumJson);
+        JsonValue json = parser.parse(kMediumJson);
         benchmark::DoNotOptimize(json);
     }
 }
@@ -166,7 +166,7 @@ static void BM_RapidJson_ParseMediumJson(benchmark::State& state) {
 static void BM_AuricJson_ParseLargeJson(benchmark::State& state) {
     for (auto _ : state) {
         JsonParser parser;
-        JsonParser::JsonValue json = parser.parse(kLargeJson);
+        JsonValue json = parser.parse(kLargeJson);
         benchmark::DoNotOptimize(json);
     }
 }

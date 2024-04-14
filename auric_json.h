@@ -18,22 +18,22 @@ constexpr bool isdigit(char c) {
     return c >= '0' && c <= '9';
 }
 
-class JsonParser {
+struct JsonValue {
 public:
-    struct JsonArray;
-    struct JsonObject;
+    struct Array;
+    struct Object;
 
-    using JsonValue = std::variant<
+    using ValueType = std::variant<
         std::nullptr_t,
         bool,
         int,
         double,
         std::string,
-        JsonArray,
-        JsonObject
+        Array,
+        Object
         >;
 
-    struct JsonArray {
+    struct Array {
         std::vector<JsonValue> elements;
 
         const JsonValue& operator[](size_t index) const {
@@ -44,7 +44,7 @@ public:
         }
     };
 
-    struct JsonObject {
+    struct Object {
         std::vector<std::pair<std::string, JsonValue>> members;
 
         const JsonValue& operator[](std::string_view key) const {
@@ -65,6 +65,154 @@ public:
         }
     };
 
+    constexpr JsonValue() = default;
+    constexpr JsonValue(const ValueType& value) : value(value) {}
+    constexpr JsonValue(ValueType&& value) : value(std::move(value)) {}
+
+    constexpr JsonValue(std::nullptr_t) : value(nullptr) {}
+    constexpr JsonValue(bool val) : value(val) {}
+    constexpr JsonValue(int val) : value(val) {}
+    constexpr JsonValue(double val) : value(val) {}
+    constexpr JsonValue(const std::string& val) : value(val) {}
+    constexpr JsonValue(std::string&& val) : value(std::move(val)) {}
+    constexpr JsonValue(std::string_view val) : value(std::string(val)) {}
+    constexpr JsonValue(const char* val) : value(std::string(val)) {}
+    constexpr JsonValue(const Array& arr) : value(arr) {}
+    constexpr JsonValue(Array&& arr) : value(std::move(arr)) {}
+    constexpr JsonValue(const Object& obj) : value(obj) {}
+    constexpr JsonValue(Object&& obj) : value(std::move(obj)) {}
+
+    constexpr bool isNull() const {
+        return JsonValue::isNull(*this);
+    }
+
+    constexpr bool isBool() const {
+        return JsonValue::isBool(*this);
+    }
+
+    constexpr bool isInt() const {
+        return JsonValue::isInt(*this);
+    }
+
+    constexpr bool isDouble() const {
+        return JsonValue::isDouble(*this);
+    }
+
+    constexpr bool isString() const {
+        return JsonValue::isString(*this);
+    }
+
+    constexpr bool isArray() const {
+        return JsonValue::isArray(*this);
+    }
+
+    constexpr bool isObject() const {
+        return JsonValue::isObject(*this);
+    }
+
+    constexpr bool toBool() const {
+        return JsonValue::toBool(*this);
+    }
+
+    constexpr int toInt() const {
+        return JsonValue::toInt(*this);
+    }
+
+    constexpr double toDouble() const {
+        return JsonValue::toDouble(*this);
+    }
+
+    constexpr std::string toString() const {
+        return JsonValue::toString(*this);
+    }
+
+    constexpr Array toArray() const {
+        return JsonValue::toArray(*this);
+    }
+
+    constexpr Object toObject() const {
+        return JsonValue::toObject(*this);
+    }
+
+    static constexpr bool isNull(const JsonValue& value) {
+        return std::holds_alternative<std::nullptr_t>(value.value);
+    }
+
+    static constexpr bool isBool(const JsonValue& value) {
+        return std::holds_alternative<bool>(value.value);
+    }
+
+    static constexpr bool isInt(const JsonValue& value) {
+        return std::holds_alternative<int>(value.value);
+    }
+
+    static constexpr bool isDouble(const JsonValue& value) {
+        return std::holds_alternative<double>(value.value);
+    }
+
+    static constexpr bool isString(const JsonValue& value) {
+        return std::holds_alternative<std::string>(value.value);
+    }
+
+    static constexpr bool isArray(const JsonValue& value) {
+        return std::holds_alternative<Array>(value.value);
+    }
+
+    static constexpr bool isObject(const JsonValue& value) {
+        return std::holds_alternative<Object>(value.value);
+    }
+
+    static constexpr bool toBool(const JsonValue& value) {
+        if (!isBool(value)) {
+            throw std::runtime_error("Value is not a boolean");
+        }
+        return std::get<bool>(value.value);
+    }
+
+    static constexpr int toInt(const JsonValue& value) {
+        if (!isInt(value)) {
+            throw std::runtime_error("Value is not an integer");
+        }
+        return std::get<int>(value.value);
+    }
+
+    static constexpr double toDouble(const JsonValue& value) {
+        if (!isDouble(value)) {
+            throw std::runtime_error("Value is not a double");
+        }
+        return std::get<double>(value.value);
+    }
+
+    static constexpr std::string toString(const JsonValue& value) {
+        if (!isString(value)) {
+            throw std::runtime_error("Value is not a string");
+        }
+        return std::get<std::string>(value.value);
+    }
+
+    static constexpr Array toArray(const JsonValue& value) {
+        if (!isArray(value)) {
+            throw std::runtime_error("Value is not an array");
+        }
+        return std::get<Array>(value.value);
+    }
+
+    static constexpr Object toObject(const JsonValue& value) {
+        if (!isObject(value)) {
+            throw std::runtime_error("Value is not an object");
+        }
+        return std::get<Object>(value.value);
+    }
+
+    ValueType value;
+};
+
+constexpr bool operator==(const JsonValue& lhs, const JsonValue& rhs) {
+    return lhs.value == rhs.value;
+}
+
+class JsonParser {
+public:
     constexpr JsonParser() noexcept = default;
     constexpr ~JsonParser() noexcept = default;
     constexpr JsonParser(const JsonParser& other) noexcept = default;
@@ -72,101 +220,31 @@ public:
     constexpr JsonParser(JsonParser&& other) noexcept = default;
     constexpr JsonParser& operator=(JsonParser&& other) noexcept = default;
 
-    constexpr JsonValue parse(std::string_view json) const {
+    static constexpr JsonValue parse(std::string_view json) {
         size_t pos = 0;
         skipWhitespace(json, pos);
         return parseValue(json, pos);
     }
 
-    static constexpr bool isNull(const JsonValue& value) {
-        return std::holds_alternative<std::nullptr_t>(value);
-    }
-
-    static constexpr bool isBool(const JsonValue& value) {
-        return std::holds_alternative<bool>(value);
-    }
-
-    static constexpr bool isInt(const JsonValue& value) {
-        return std::holds_alternative<int>(value);
-    }
-
-    static constexpr bool isDouble(const JsonValue& value) {
-        return std::holds_alternative<double>(value);
-    }
-
-    static constexpr bool isString(const JsonValue& value) {
-        return std::holds_alternative<std::string>(value);
-    }
-
-    static constexpr bool isArray(const JsonValue& value) {
-        return std::holds_alternative<JsonArray>(value);
-    }
-
-    static constexpr bool isObject(const JsonValue& value) {
-        return std::holds_alternative<JsonObject>(value);
-    }
-
-    static constexpr bool toBool(const JsonValue& value) {
-        if (!isBool(value)) {
-            throw std::runtime_error("Value is not a boolean");
-        }
-        return std::get<bool>(value);
-    }
-
-    static constexpr int toInt(const JsonValue& value) {
-        if (!isInt(value)) {
-            throw std::runtime_error("Value is not an integer");
-        }
-        return std::get<int>(value);
-    }
-
-    static constexpr double toDouble(const JsonValue& value) {
-        if (!isDouble(value)) {
-            throw std::runtime_error("Value is not a double");
-        }
-        return std::get<double>(value);
-    }
-
-    static constexpr std::string toString(const JsonValue& value) {
-        if (!isString(value)) {
-            throw std::runtime_error("Value is not a string");
-        }
-        return std::get<std::string>(value);
-    }
-
-    static constexpr const JsonArray& toArray(const JsonValue& value) {
-        if (!isArray(value)) {
-            throw std::runtime_error("Value is not an array");
-        }
-        return std::get<JsonArray>(value);
-    }
-
-    static constexpr const JsonObject& toObject(const JsonValue& value) {
-        if (!isObject(value)) {
-            throw std::runtime_error("Value is not an object");
-        }
-        return std::get<JsonObject>(value);
-    }
-
 private:
-    constexpr void skipWhitespace(std::string_view json, size_t& pos) const {
+    static constexpr void skipWhitespace(std::string_view json, size_t& pos) {
         while (pos < json.size() && isspace(json[pos]))
             ++pos;
     }
 
-    constexpr char peek(std::string_view json, size_t pos) const {
+    static constexpr char peek(std::string_view json, size_t pos) {
         if (pos >= json.size())
             throw std::runtime_error("Unexpected end of JSON");
         return json[pos];
     }
 
-    constexpr char consume(std::string_view json, size_t& pos) const {
+    static constexpr char consume(std::string_view json, size_t& pos) {
         if (pos >= json.size())
             throw std::runtime_error("Unexpected end of JSON");
         return json[pos++];
     }
 
-    constexpr JsonValue parseValue(std::string_view json, size_t& pos) const {
+    static constexpr JsonValue parseValue(std::string_view json, size_t& pos) {
         switch (peek(json, pos)) {
         case 'n': return parseNull(json, pos);
         case 't': return parseTrue(json, pos);
@@ -178,7 +256,7 @@ private:
         }
     }
 
-    constexpr std::nullptr_t parseNull(std::string_view json, size_t& pos) const {
+    static constexpr std::nullptr_t parseNull(std::string_view json, size_t& pos) {
         constexpr auto null = std::string_view("ull");
         if (json.find(null, pos + 1) == pos + 1) {
             pos += null.size() + 1;
@@ -187,7 +265,7 @@ private:
         throw std::runtime_error("Invalid JSON: expected 'null'");
     }
 
-    constexpr bool parseTrue(std::string_view json, size_t& pos) const {
+    static constexpr bool parseTrue(std::string_view json, size_t& pos) {
         constexpr auto str = std::string_view("rue");
         if (json.find(str, pos + 1) == pos + 1) {
             pos += str.size() + 1;
@@ -196,7 +274,7 @@ private:
         throw std::runtime_error("Invalid JSON: expected 'true'");
     }
 
-    constexpr bool parseFalse(std::string_view json, size_t& pos) const {
+    static constexpr bool parseFalse(std::string_view json, size_t& pos) {
         constexpr auto str = std::string_view("alse");
         if (json.find(str, pos + 1) == pos + 1) {
             pos += str.size() + 1;
@@ -205,7 +283,7 @@ private:
         throw std::runtime_error("Invalid JSON: expected 'false'");
     }
 
-    constexpr std::string parseString(std::string_view json, size_t& pos) const {
+    static constexpr std::string parseString(std::string_view json, size_t& pos) {
         std::string str;
         consume(json, pos); // consume opening quote
 
@@ -273,7 +351,7 @@ private:
         return str;
     }
 
-    constexpr uint32_t parseUnicodeEscape(std::string_view json, size_t& pos) const {
+    static constexpr uint32_t parseUnicodeEscape(std::string_view json, size_t& pos) {
         uint32_t codepoint = 0;
         for (int i = 0; i < 4; ++i) {
             char c = peek(json, pos);
@@ -285,7 +363,7 @@ private:
         return codepoint;
     }
 
-    JsonValue parseNumber(std::string_view json, size_t& pos) const {
+    static JsonValue parseNumber(std::string_view json, size_t& pos) {
         size_t endPos = pos;
         bool isFloatingPoint = false;
 
@@ -340,8 +418,8 @@ private:
         }
     }
 
-    JsonArray parseArray(std::string_view json, size_t& pos) const {
-        JsonArray arr;
+    static JsonValue parseArray(std::string_view json, size_t& pos) {
+        JsonValue::Array arr;
         consume(json, pos); // consume opening bracket
         skipWhitespace(json, pos);
         if (peek(json, pos) != ']') {
@@ -364,8 +442,8 @@ private:
         return arr;
     }
 
-    JsonObject parseObject(std::string_view json, size_t& pos) const {
-        JsonObject obj;
+    static JsonValue parseObject(std::string_view json, size_t& pos) {
+        JsonValue::Object obj;
         consume(json, pos); // consume opening brace
         skipWhitespace(json, pos);
         if (peek(json, pos) != '}') {
@@ -394,47 +472,3 @@ private:
     }
 };
 
-constexpr bool operator==(const JsonParser::JsonValue& lhs, const JsonParser::JsonValue& rhs) {
-    return std::visit(
-        [](const auto& l, const auto& r) {
-            using T1 = std::decay_t<decltype(l)>;
-            using T2 = std::decay_t<decltype(r)>;
-
-            if constexpr (std::is_same_v<T1, std::nullptr_t> && std::is_same_v<T2, std::nullptr_t>) {
-                return true;
-            } else if constexpr (std::is_same_v<T1, bool> && std::is_same_v<T2, bool>) {
-                return l == r;
-            } else if constexpr (std::is_same_v<T1, int> && std::is_same_v<T2, int>) {
-                return l == r;
-            } else if constexpr (std::is_same_v<T1, double> && std::is_same_v<T2, double>) {
-                return l == r;
-            } else if constexpr (std::is_same_v<T1, std::string> && std::is_same_v<T2, std::string>) {
-                return l == r;
-            }
-            else if constexpr (std::is_same_v<T1, std::string_view> && std::is_same_v<T2, std::string>) {
-                return l == r;
-            }
-            else if constexpr (std::is_same_v<T1, std::string> && std::is_same_v<T2, std::string_view>) {
-                return l == r;
-            }
-            else if constexpr (std::is_same_v<T1, JsonParser::JsonArray> && std::is_same_v<T2, JsonParser::JsonArray>) {
-                return l.elements == r.elements;
-            } else if constexpr (std::is_same_v<T1, JsonParser::JsonObject> && std::is_same_v<T2, JsonParser::JsonObject>) {
-                return l.members == r.members;
-            } else {
-                return false;
-            }
-        },
-        lhs, rhs);
-}
-
-constexpr bool operator==(const std::vector<std::pair<std::string, JsonParser::JsonValue>>& lhs,
-                          const std::vector<std::pair<std::string, JsonParser::JsonValue>>& rhs) {
-    if (lhs.size() != rhs.size())
-        return false;
-
-    return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                      [](const auto& l, const auto& r) {
-                          return l.first == r.first && l.second == r.second;
-                      });
-}
