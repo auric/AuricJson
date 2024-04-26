@@ -286,68 +286,40 @@ private:
     static constexpr std::string parseString(std::string_view json, size_t& pos) {
         std::string str;
         consume(json, pos); // consume opening quote
-
-        while (peek(json, pos) != '"') {
-            if (peek(json, pos) == '\\') {
+        while (true) {
+            char c = peek(json, pos);
+            if (c == '"') {
+                ++pos; // consume closing quote
+                break;
+            } else if (c == '\\') {
                 ++pos; // skip escape character
-                switch (peek(json, pos)) {
+                c = peek(json, pos);
+                switch (c) {
                 case '"':
                 case '\\':
                 case '/':
-                    str += consume(json, pos);
-                    break;
-                case 'b':
+                    str.push_back(c);
                     ++pos;
-                    str += '\b';
                     break;
-                case 'f':
-                    ++pos;
-                    str += '\f';
-                    break;
-                case 'n':
-                    ++pos;
-                    str += '\n';
-                    break;
-                case 'r':
-                    ++pos;
-                    str += '\r';
-                    break;
-                case 't':
-                    ++pos;
-                    str += '\t';
-                    break;
+                case 'b': str.push_back('\b'); ++pos; break;
+                case 'f': str.push_back('\f'); ++pos; break;
+                case 'n': str.push_back('\n'); ++pos; break;
+                case 'r': str.push_back('\r'); ++pos; break;
+                case 't': str.push_back('\t'); ++pos; break;
                 case 'u': {
                     ++pos;
                     uint32_t codepoint = parseUnicodeEscape(json, pos);
-                    // Encode the Unicode codepoint as UTF-8
-                    if (codepoint <= 0x7F) {
-                        str += static_cast<char>(codepoint);
-                    } else if (codepoint <= 0x7FF) {
-                        str += static_cast<char>(0xC0 | (codepoint >> 6));
-                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
-                    } else if (codepoint <= 0xFFFF) {
-                        str += static_cast<char>(0xE0 | (codepoint >> 12));
-                        str += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
-                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
-                    } else if (codepoint <= 0x10FFFF) {
-                        str += static_cast<char>(0xF0 | (codepoint >> 18));
-                        str += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
-                        str += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
-                        str += static_cast<char>(0x80 | (codepoint & 0x3F));
-                    } else {
-                        throw std::runtime_error("Invalid Unicode codepoint");
-                    }
+                    encodeUTF8(str, codepoint);
                     break;
                 }
                 default:
                     throw std::runtime_error("Invalid escape sequence");
                 }
             } else {
-                str += consume(json, pos);
+                str.push_back(c);
+                ++pos;
             }
         }
-
-        consume(json, pos); // consume closing quote
         return str;
     }
 
@@ -355,12 +327,31 @@ private:
         uint32_t codepoint = 0;
         for (int i = 0; i < 4; ++i) {
             char c = peek(json, pos);
-            codepoint = (codepoint << 4) | ((c >= 'A' && c <= 'F') ? (c - 'A' + 10) :
-                                                (c >= 'a' && c <= 'f') ? (c - 'a' + 10) :
-                                                (c - '0'));
+            uint8_t digit = (c >= 'A') ? (c & 0xDF) - 'A' + 10 : c - '0'; // Directly compute hexadecimal value
+            codepoint = (codepoint << 4) | digit;
             ++pos;
         }
         return codepoint;
+    }
+
+    static constexpr void encodeUTF8(std::string& str, uint32_t codepoint) {
+        if (codepoint <= 0x7F) {
+            str.push_back(static_cast<char>(codepoint));
+        } else if (codepoint <= 0x7FF) {
+            str.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+            str.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0xFFFF) {
+            str.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+            str.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            str.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0x10FFFF) {
+            str.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+            str.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            str.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            str.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else {
+            throw std::runtime_error("Invalid Unicode codepoint");
+        }
     }
 
     static JsonValue parseNumber(std::string_view json, size_t& pos) {
