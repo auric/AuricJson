@@ -10,6 +10,10 @@ FetchContent_Declare(googletest
     GIT_TAG v1.14.0
 )
 
+FetchContent_MakeAvailable(
+    googletest
+)
+
 enable_testing()
 
 add_executable(auric_json_tests

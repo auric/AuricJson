@@ -58,6 +58,23 @@ TEST(JsonParser, ParseStrings) {
     }
 }
 
+TEST(JsonParser, ParseStringsWithQuotesAndBackslashes) {
+    {
+        std::string_view jsonStr = R"("String with \"quotes\"")"sv;
+        JsonParser parser;
+        JsonValue jsonValue = parser.parse(jsonStr);
+        EXPECT_TRUE(JsonValue::isString(jsonValue.value));
+        EXPECT_EQ(JsonValue::toString(jsonValue.value), "String with \"quotes\"");
+    }
+    {
+        std::string_view jsonStr = R"("String with \\backslashes\\")"sv;
+        JsonParser parser;
+        JsonValue jsonValue = parser.parse(jsonStr);
+        EXPECT_TRUE(JsonValue::isString(jsonValue.value));
+        EXPECT_EQ(JsonValue::toString(jsonValue.value), "String with \\backslashes\\");
+    }
+}
+
 TEST(JsonParser, ParseUnicodeStrings) {
     {
         std::string_view jsonStr = R"("Hello, 世界!")"sv;
